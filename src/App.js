@@ -1,21 +1,27 @@
 import React, {useState, useEffect, useRef} from 'react';
 import FlashCardList from './FlashCardList';
 
-import axios from 'axios';
+import axios from './axios';
+
 import './app.css';
 
 function App() {
   const [flashcards, setFlashcards] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const categoryEl = useRef();
   const amountEl = useRef();
 
   useEffect(() => {
-    axios.get(`https://opentdb.com/api_category.php`)
-      .then((res) => {
-        setCategories(res.data.trivia_categories);
+    setIsLoading(true);
+    axios.get(`/categories`).then((res) => {
+      res.data.map((data) => {
+        // setCategories((categories) => [...categories, data.category])
+        setCategories((categories) => categories.concat(data.category));
+        setIsLoading(false);
       });
+    });
   }, []);
 
   function decodeString(str) {
@@ -27,46 +33,54 @@ function App() {
   function handleSubmit(e) {
     e.preventDefault();
 
+   
     axios
-      .get(`https://opentdb.com/api.php`, {
-      params: {
-        amount: amountEl.current.value,
-        category: categoryEl.current.value
-      }
-    }).then((res) => {
-      setFlashcards(res.data.results.map((questionEl, index) => {
-          const answer = decodeString(questionEl.correct_answer);
-          const options = [
-            ...questionEl.incorrect_answers.map((a) => decodeString(a)),
-            answer,
-          ];
+      .get(`/questions`, {
+        params: {
+          amount: amountEl.current.value,
+          category:  categories[categoryEl.current.value]
+        },
+      })
+      .then((res) => {
+        setFlashcards(
+          res.data.map((questionEl, index) => {
+            console.log(questionEl);
+            const answer = decodeString(questionEl.correct_answer);
+            const options = [
+              ...questionEl.incorrect_answers.map((a) => decodeString(a)),
+              answer,
+            ];
 
-          return {
-            id: `${index}-${Date.now()}`,
-            question: decodeString(questionEl.question),
-            answer,
-            options: options.sort(() => Math.random() - 0.5),
-          };
-        })
-      );
-      console.log(res.data);
-    });
+            return {
+              id: `${index}-${Date.now()}`,
+              question: decodeString(questionEl.question),
+              answer,
+              options: options.sort(() => Math.random() - 0.5),
+            };
+          })
+        );
+        console.log(res.data);
+      });
   }
+
+  const DisplayCategories = () => (
+    <select id='category' ref={categoryEl}>
+      {categories.map((category, index) => {
+        return (
+          <option value={index} key={index}>
+            {category}
+          </option>
+        );
+      })}
+    </select>
+  );
 
   return (
     <>
       <form className='header' onSubmit={handleSubmit}>
         <div className='form-group'>
           <label htmlFor='category'>Category</label>
-          <select id='category' ref={categoryEl}>
-            {categories.map((category) => {
-              return (
-                <option value={category.id} key={category.id}>
-                  {category.name}
-                </option>
-              );
-            })}
-          </select>
+          {!isLoading ? <DisplayCategories /> : <div>Loading...</div>}
         </div>
         <div className='form-group'>
           <label htmlFor='amount'>No. of Questions</label>
@@ -89,6 +103,5 @@ function App() {
     </>
   );
 }
-
 
 export default App;
